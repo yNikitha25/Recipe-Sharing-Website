@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pro Recipe Book</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="icon" type="image/png" href="https://img.icons8.com/color/48/cookbook.png">
+  <style>
+    :root {
+      --bg: #f5f6fa;
+      --fg: #2d3436;
+      --card-bg: #ffffff;
+      --accent: #0984e3;
+      --shadow: rgba(0, 0, 0, 0.1);
+    }
+    body.dark {
+      --bg: #1e272e;
+      --fg: #f1f2f6;
+      --card-bg: #2f3640;
+      --accent: #74b9ff;
+      --shadow: rgba(255, 255, 255, 0.05);
+    }
+    * { box-sizing: border-box; }
+    body {
+      font-family: 'Poppins', sans-serif;
+      background: var(--bg);
+      color: var(--fg);
+      margin: 0;
+      padding: 20px;
+      transition: all 0.4s ease;
+    }
+    h1 {
+      text-align: center;
+      color: var(--accent);
+      font-size: 2.8rem;
+      animation: fadeInDown 1s ease-out;
+    }
+    .top-bar, .theme-toggle {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+      margin: 20px 0;
+      flex-wrap: wrap;
+    }
+    input, select, textarea, button {
+      padding: 10px;
+      border-radius: 8px;
+      border: 1px solid #ccc;
+      font-size: 16px;
+      transition: 0.3s;
+    }
+    button {
+      background-color: var(--accent);
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.3s ease;
+    }
+    button:hover {
+      background-color: #0d72c4;
+      transform: scale(1.05);
+    }
+    .form-section, .recipe-card {
+      background-color: var(--card-bg);
+      padding: 20px;
+      border-radius: 14px;
+      box-shadow: 0 8px 25px var(--shadow);
+      margin: 10px auto;
+      max-width: 700px;
+      transition: transform 0.3s ease;
+    }
+    .form-section:hover, .recipe-card:hover {
+      transform: translateY(-4px);
+    }
+    .recipe-card img {
+      width: 100%;
+      border-radius: 12px;
+      margin-bottom: 10px;
+      object-fit: cover;
+      max-height: 300px;
+    }
+    .actions {
+      text-align: right;
+      margin-top: 10px;
+    }
+    .highlight { background-color: yellow; }
+    label {
+      display: block;
+      margin-top: 10px;
+      font-weight: 600;
+    }
+    textarea { resize: vertical; }
+    .notification {
+      text-align: center;
+      background: #00b894;
+      color: white;
+      padding: 10px;
+      border-radius: 6px;
+      margin: 10px auto;
+      max-width: 500px;
+      display: none;
+    }
+    @keyframes fadeInDown {
+      from { opacity: 0; transform: translateY(-30px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    @media screen and (max-width: 600px) {
+      input, select, textarea, button {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <h1>🍳 Pro Recipe Book</h1>
+  <div class="theme-toggle">
+    <button onclick="toggleTheme()">🌗 Theme</button>
+    <button onclick="exportPDF()">📤 Export</button>
+    <button onclick="clearRecipes()">🧹 Clear All</button>
+    <button onclick="importRecipes()">📥 Import</button>
+    <button onclick="downloadRecipes()">💾 Download JSON</button>
+  </div>
+
+  <div class="top-bar">
+    <input type="text" id="search" placeholder="Search...">
+    <select id="filter">
+      <option value="All">All</option>
+      <option value="Breakfast">Breakfast</option>
+      <option value="Lunch">Lunch</option>
+      <option value="Dinner">Dinner</option>
+      <option value="Dessert">Dessert</option>
+    </select>
+  </div>
+
+  <div class="form-section">
+    <h2 style="color: var(--accent);">➕ Add New Recipe</h2>
+    <label for="title">Title</label>
+    <input type="text" id="title" placeholder="e.g., Chocolate Cake">
+    <label for="category">Category</label>
+    <input type="text" id="category" placeholder="e.g., Dessert">
+    <label for="ingredients">Ingredients</label>
+    <textarea id="ingredients" placeholder="Enter ingredients" rows="3"></textarea>
+    <label for="steps">Steps</label>
+    <textarea id="steps" placeholder="Enter steps" rows="3"></textarea>
+    <label for="image">Upload Image</label>
+    <input type="file" id="image" accept="image/*">
+    <br><br>
+    <button onclick="addRecipe()">✅ Save Recipe</button>
+  </div>
+
+  <div class="notification" id="notify">Recipe added successfully!</div>
+  <div id="recipes"></div>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.9.3/html2pdf.bundle.min.js"></script>
+  <script>
+    const search = document.getElementById("search");
+    const filter = document.getElementById("filter");
+    const notify = document.getElementById("notify");
+    const recipesContainer = document.getElementById("recipes");
+
+    let recipes = JSON.parse(localStorage.getItem("recipes")) || [];
+
+    function toggleTheme() {
+      document.body.classList.toggle("dark");
+    }
+
+    function showNotification(msg = "Recipe added successfully!") {
+      notify.textContent = msg;
+      notify.style.display = "block";
+      setTimeout(() => notify.style.display = "none", 2000);
+    }
+
+    function saveRecipes() {
+      localStorage.setItem("recipes", JSON.stringify(recipes));
+    }
+
+    function highlight(text, keyword) {
+      if (!keyword) return text;
+      return text.replace(new RegExp(`(${keyword})`, 'gi'), '<span class="highlight">$1</span>');
+    }
+
+    function renderRecipes() {
+      const keyword = search.value.toLowerCase();
+      const selectedCategory = filter.value;
+      recipesContainer.innerHTML = "";
+
+      const filtered = recipes.filter(r =>
+        r.title.toLowerCase().includes(keyword) &&
+        (selectedCategory === "All" || r.category === selectedCategory)
+      );
+
+      filtered.forEach((r, i) => {
+        const card = document.createElement("div");
+        card.className = "recipe-card";
+        card.innerHTML = `
+          ${r.image ? `<img src="${r.image}" alt="Recipe Image">` : ''}
+          <h3>${highlight(r.title, keyword)}</h3>
+          <p><strong>Category:</strong> ${r.category}</p>
+          <p><strong>Ingredients:</strong><br>${r.ingredients.replace(/\n|,/g, "<br>")}</p>
+          <p><strong>Steps:</strong><br>${r.steps.replace(/\n|,/g, "<br>")}</p>
+          <div class="actions">
+            <button onclick="deleteRecipe(${i})">🗑 Delete</button>
+          </div>
+        `;
+        recipesContainer.appendChild(card);
+      });
+
+      if (filtered.length === 0) {
+        recipesContainer.innerHTML = "<p style='text-align:center;'>No recipes found.</p>";
+      }
+    }
+
+    function addRecipe() {
+      const title = document.getElementById("title").value.trim();
+      const category = document.getElementById("category").value.trim();
+      const ingredients = document.getElementById("ingredients").value.trim();
+      const steps = document.getElementById("steps").value.trim();
+      const imageInput = document.getElementById("image");
+
+      if (!title || !category || !ingredients || !steps) {
+        alert("Please fill all fields.");
+        return;
+      }
+
+      const recipe = { title, category, ingredients, steps, image: "" };
+
+      if (imageInput.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          recipe.image = e.target.result;
+          recipes.push(recipe);
+          saveRecipes();
+          renderRecipes();
+          showNotification();
+        };
+        reader.readAsDataURL(imageInput.files[0]);
+      } else {
+        recipes.push(recipe);
+        saveRecipes();
+        renderRecipes();
+        showNotification();
+      }
+
+      document.getElementById("title").value = "";
+      document.getElementById("category").value = "";
+      document.getElementById("ingredients").value = "";
+      document.getElementById("steps").value = "";
+      imageInput.value = "";
+    }
+
+    function deleteRecipe(index) {
+      if (confirm("Delete this recipe?")) {
+        recipes.splice(index, 1);
+        saveRecipes();
+        renderRecipes();
+        showNotification("Recipe deleted.");
+      }
+    }
+
+    function clearRecipes() {
+      if (confirm("Clear all recipes?")) {
+        recipes = [];
+        saveRecipes();
+        renderRecipes();
+        showNotification("All recipes cleared.");
+      }
+    }
+
+    function exportPDF() {
+      html2pdf().from(recipesContainer).save("My_Recipes.pdf");
+    }
+
+    function downloadRecipes() {
+      const blob = new Blob([JSON.stringify(recipes, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'recipes.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function importRecipes() {
+      const input = document.createElement('input');
+      input.type = 'file';
+      input.accept = 'application/json';
+      input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          try {
+            const data = JSON.parse(event.target.result);
+            if (Array.isArray(data)) {
+              recipes = data;
+              saveRecipes();
+              renderRecipes();
+              showNotification("Recipes imported.");
+            } else {
+              alert("Invalid JSON structure.");
+            }
+          } catch {
+            alert("Invalid JSON file.");
+          }
+        };
+        reader.readAsText(file);
+      };
+      input.click();
+    }
+
+    search.addEventListener("input", renderRecipes);
+    filter.addEventListener("change", renderRecipes);
+
+    renderRecipes();
+  </script>
+</body>
+</html>
